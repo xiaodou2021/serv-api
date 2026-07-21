@@ -1,0 +1,103 @@
+spring:
+  # 数据源配置 - MySQL数据库连接
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource           # 使用Druid连接池
+    driver-class-name: com.mysql.cj.jdbc.Driver            # MySQL驱动类
+    url: jdbc:mysql://127.0.0.1:3306/qingyu?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true
+    username: root                                         # 数据库用户名
+    password: 123456                                      # 数据库密码
+    druid:                                                 # Druid连接池配置
+      initial-size: 5                                      # 初始化连接数
+      min-idle: 5                                         # 最小空闲连接数
+      max-active: 20                                       # 最大活跃连接数
+      max-wait: 60000                                     # 获取连接最大等待时间（毫秒）
+      time-between-eviction-runs-millis: 60000            # 连接回收线程运行间隔（毫秒）
+      min-evictable-idle-time-millis: 300000              # 连接最小空闲时间（毫秒），超过则回收
+      validation-query: SELECT 1 FROM DUAL                # 连接有效性检测SQL
+      test-while-idle: true                                # 空闲时检测连接有效性
+      test-on-borrow: false                                # 获取连接时不检测（性能优化）
+      test-on-return: false                                # 归还连接时不检测（性能优化）
+      pool-prepared-statements: true                       # 启用预编译语句池
+      max-pool-prepared-statement-per-connection-size: 20  # 每个连接的预编译语句最大数量
+      filters: stat,wall,slf4j                            # 启用的过滤器：统计、防火墙、日志
+      connection-properties: druid.stat.mergeSql=true;druid.stat.slowSqlMillis=5000  # 连接属性配置
+      use-global-data-source-stat: true                    # 使用全局数据源统计
+
+  # Redis配置 - 缓存服务
+  data:
+    redis:
+      host: localhost                                      # Redis主机地址
+      port: 6379                                          # Redis端口
+      password:                                            # Redis密码（空表示无密码）
+      database: 0                                         # 使用的数据库索引
+      timeout: 10000ms                                    # 连接超时时间
+      lettuce:                                             # Lettuce客户端配置
+        pool:
+          max-active: 8                                    # 最大活跃连接数
+          max-wait: -1ms                                   # 获取连接最大等待时间（-1表示无限等待）
+          max-idle: 8                                      # 最大空闲连接数
+          min-idle: 0                                      # 最小空闲连接数
+
+# MyBatis-Plus配置 - ORM框架
+mybatis-plus:
+  mapper-locations: classpath:mapper/**/*.xml              # Mapper XML文件位置
+  type-aliases-package: com.iy.api.model.entity           # 实体类别名包路径
+  configuration:
+    map-underscore-to-camel-case: true                    # 开启下划线转驼峰命名
+  global-config:
+    ddl-auto: update                                      # 自动更新表结构
+    db-config:
+      id-type: auto                                       # ID生成策略：自增
+      logic-delete-field: deleted                         # 逻辑删除字段名
+      logic-delete-value: 1                               # 逻辑删除值
+      logic-not-delete-value: 0                           # 逻辑未删除值
+
+# 日志配置
+logging:
+  config: classpath:logback-spring.xml                    # Logback配置文件位置
+  file:
+    name: serv-api.log                                    # 日志文件名
+    path: /Users/liuxiaonan/Downloads/logs                # 日志文件存储路径
+  level:                                                  # 日志级别配置
+    com.iy.api: DEBUG                                     # 应用代码日志级别
+    com.baomidou.mybatisplus: DEBUG                       # MyBatis-Plus日志级别
+    com.alibaba.druid: DEBUG                              # Druid连接池日志级别
+
+resilience4j:
+  # 熔断器配置 - 解决服务雪崩问题
+  circuitbreaker:
+    instances:
+      backendA:
+        register-health-indicator: true           # 注册健康指标，便于监控
+        sliding-window-size: 10                   # 滑动窗口大小，统计最近10次调用
+        minimum-number-of-calls: 5                # 触发熔断的最小调用次数
+        permitted-number-of-calls-in-half-open-state: 3  # 半开状态下允许的调用次数
+        automatic-transition-from-open-to-half-open-enabled: true  # 自动从熔断状态切换到半开状态
+        wait-duration-in-open-state: 5000         # 熔断状态持续时间（毫秒），5秒后尝试恢复
+        failure-rate-threshold: 50                # 失败率阈值（百分比），超过50%触发熔断
+        event-consumer-buffer-size: 10            # 事件缓冲区大小
+        record-exceptions:                        # 需要记录的异常类型
+          - java.lang.Exception
+
+  # 超时限制器配置 - 解决服务超时问题
+  timelimiter:
+    instances:
+      backendA:
+        timeout-duration: 3000                    # 超时时间（毫秒），3秒超时
+        cancel-running-future: true               # 超时时取消正在运行的任务
+
+  # 隔离舱配置 - 解决并发耗尽问题
+  bulkhead:
+    instances:
+      backendA:
+        max-concurrent-calls: 10                  # 最大并发调用数，超过则进入等待队列
+        max-wait-duration: 1000                  # 等待队列超时时间（毫秒），1秒
+
+  # 限流器配置 - 解决突发流量问题
+  ratelimiter:
+    instances:
+      backendA:
+        limit-for-period: 10                      # 限流周期内允许的请求数
+        limit-refresh-period: 1000               # 限流周期（毫秒），每秒刷新
+        timeout-duration: 500                    # 获取限流许可的超时时间（毫秒），500毫秒
+        register-health-indicator: true           # 注册健康指标
