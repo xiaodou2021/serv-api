@@ -3,6 +3,8 @@ package com.iy.api.handler;
 import com.iy.api.common.ResultHelper;
 import com.iy.api.common.ResultVO;
 import com.iy.api.common.constants.SystemConstants;
+import com.iy.api.common.enums.BizCodeEnum;
+import com.iy.api.common.exception.BizException;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.ratelimiter.RequestNotPermitted;
@@ -21,46 +23,11 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(CallNotPermittedException.class)
-    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
-    public ResultVO<Void> handleCircuitBreakerException(CallNotPermittedException e) {
-        log.error("Circuit breaker is open, service unavailable: {}", e.getMessage());
-        return ResultHelper.error(SystemConstants.SERVER_ERROR_CODE, "Service temporarily unavailable, please try again later");
-    }
-
-    @ExceptionHandler(BulkheadFullException.class)
-    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
-    public ResultVO<Void> handleBulkheadException(BulkheadFullException e) {
-        log.error("Bulkhead full, too many concurrent requests: {}", e.getMessage());
-        return ResultHelper.error(SystemConstants.CLIENT_ERROR_CODE, "Too many concurrent requests, please try again later");
-    }
-
-    @ExceptionHandler(RequestNotPermitted.class)
-    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
-    public ResultVO<Void> handleRateLimitException(RequestNotPermitted e) {
-        log.error("Rate limit exceeded: {}", e.getMessage());
-        return ResultHelper.error(SystemConstants.CLIENT_ERROR_CODE, "Rate limit exceeded, please try again later");
-    }
-
-    @ExceptionHandler(TimeoutException.class)
-    @ResponseStatus(HttpStatus.REQUEST_TIMEOUT)
-    public ResultVO<Void> handleTimeoutException(TimeoutException e) {
-        log.error("Request timeout: {}", e.getMessage());
-        return ResultHelper.error(SystemConstants.SERVER_ERROR_CODE, "Request timeout, please try again later");
-    }
-
-    @ExceptionHandler(Exception.class)
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public ResultVO<Void> handleException(Exception e) {
-        log.error("Unexpected exception occurred", e);
-        return ResultHelper.error(SystemConstants.SERVER_ERROR_CODE, "Internal server error");
-    }
-
-    @ExceptionHandler(RuntimeException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ResultVO<Void> handleRuntimeException(RuntimeException e) {
-        log.error("Runtime exception occurred", e);
-        return ResultHelper.error(SystemConstants.CLIENT_ERROR_CODE, e.getMessage());
+    @ExceptionHandler(BizException.class)
+    @ResponseStatus(HttpStatus.OK)
+    public ResultVO<Void> handleBizException(BizException e) {
+        log.warn("Business exception: code={}, message={}", e.getCode(), e.getMessage());
+        return ResultHelper.error(e.getCode(), e.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -69,14 +36,49 @@ public class GlobalExceptionHandler {
         String errorMessage = e.getBindingResult().getFieldErrors().stream()
                 .map(FieldError::getDefaultMessage)
                 .collect(Collectors.joining(", "));
-        log.error("Validation exception occurred: {}", errorMessage);
-        return ResultHelper.error(SystemConstants.CLIENT_ERROR_CODE, errorMessage);
+        log.warn("Validation exception: {}", errorMessage);
+        return ResultHelper.error(BizCodeEnum.PARAM_INVALID.getCode(), errorMessage);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ResultVO<Void> handleIllegalArgumentException(IllegalArgumentException e) {
-        log.error("Illegal argument exception occurred", e);
-        return ResultHelper.error(SystemConstants.CLIENT_ERROR_CODE, e.getMessage());
+        log.warn("Illegal argument: {}", e.getMessage());
+        return ResultHelper.error(BizCodeEnum.PARAM_INVALID.getCode(), e.getMessage());
+    }
+
+    @ExceptionHandler(CallNotPermittedException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public ResultVO<Void> handleCircuitBreakerException(CallNotPermittedException e) {
+        log.error("Circuit breaker is open, service unavailable: {}", e.getMessage());
+        return ResultHelper.error(BizCodeEnum.SERVICE_UNAVAILABLE.getCode(), BizCodeEnum.SERVICE_UNAVAILABLE.getMessage());
+    }
+
+    @ExceptionHandler(BulkheadFullException.class)
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    public ResultVO<Void> handleBulkheadException(BulkheadFullException e) {
+        log.error("Bulkhead full, too many concurrent requests: {}", e.getMessage());
+        return ResultHelper.error(BizCodeEnum.RATE_LIMIT_EXCEEDED.getCode(), BizCodeEnum.RATE_LIMIT_EXCEEDED.getMessage());
+    }
+
+    @ExceptionHandler(RequestNotPermitted.class)
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    public ResultVO<Void> handleRateLimitException(RequestNotPermitted e) {
+        log.error("Rate limit exceeded: {}", e.getMessage());
+        return ResultHelper.error(BizCodeEnum.RATE_LIMIT_EXCEEDED.getCode(), BizCodeEnum.RATE_LIMIT_EXCEEDED.getMessage());
+    }
+
+    @ExceptionHandler(TimeoutException.class)
+    @ResponseStatus(HttpStatus.REQUEST_TIMEOUT)
+    public ResultVO<Void> handleTimeoutException(TimeoutException e) {
+        log.error("Request timeout: {}", e.getMessage());
+        return ResultHelper.error(BizCodeEnum.SERVICE_UNAVAILABLE.getCode(), "请求超时，请稍后重试");
+    }
+
+    @ExceptionHandler(Exception.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ResultVO<Void> handleException(Exception e) {
+        log.error("Unexpected exception occurred", e);
+        return ResultHelper.error(BizCodeEnum.SYSTEM_ERROR.getCode(), BizCodeEnum.SYSTEM_ERROR.getMessage());
     }
 }

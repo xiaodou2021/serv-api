@@ -45,3 +45,27 @@ CREATE TABLE `sys_user_info` (
   UNIQUE KEY `uk_user_id` (`user_id`,`deleted`) COMMENT '一个账号对应一条资料',
   KEY `idx_real_name` (`real_name`) COMMENT '姓名检索索引'
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户基础信息表';
+
+-- 操作审计日志表 --
+DROP TABLE IF EXISTS `sys_audit_log`;
+CREATE TABLE `sys_audit_log` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id` BIGINT DEFAULT NULL COMMENT '操作用户ID',
+  `account` VARCHAR(50) DEFAULT '' COMMENT '操作用户账号',
+  `module` VARCHAR(50) DEFAULT '' COMMENT '所属模块',
+  `operation_type` VARCHAR(20) DEFAULT '' COMMENT '操作类型',
+  `description` VARCHAR(255) DEFAULT '' COMMENT '操作描述',
+  `request_method` VARCHAR(10) DEFAULT '' COMMENT '请求方式',
+  `request_uri` VARCHAR(255) DEFAULT '' COMMENT '请求地址',
+  `request_ip` VARCHAR(50) DEFAULT '' COMMENT '请求IP',
+  `request_params` TEXT DEFAULT NULL COMMENT '请求参数',
+  `response_result` TEXT DEFAULT NULL COMMENT '响应结果',
+  `success` TINYINT DEFAULT 1 COMMENT '是否成功：0失败 1成功',
+  `error_message` VARCHAR(500) DEFAULT '' COMMENT '错误信息',
+  `duration` BIGINT DEFAULT 0 COMMENT '执行时长（毫秒）',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_user_id` (`user_id`) COMMENT '按用户查询',
+  KEY `idx_create_time` (`create_time`) COMMENT '按时间查询',
+  KEY `idx_module` (`module`) COMMENT '按模块查询'
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作审计日志表';

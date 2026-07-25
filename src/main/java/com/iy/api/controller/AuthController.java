@@ -2,7 +2,13 @@ package com.iy.api.controller;
 
 import com.iy.api.common.ResultHelper;
 import com.iy.api.common.ResultVO;
+import com.iy.api.common.annotation.AuditLog;
+import com.iy.api.common.annotation.RateLimit;
 import com.iy.api.common.constants.CacheConstants;
+import com.iy.api.common.enums.BizCodeEnum;
+import com.iy.api.common.enums.OperationType;
+import com.iy.api.common.enums.RateLimitType;
+import com.iy.api.common.exception.BizException;
 import com.iy.api.common.util.IdGenUtils;
 import com.iy.api.common.utils.JwtTokenUtil;
 import com.iy.api.model.entity.SysLoginUserEntity;
@@ -61,10 +67,12 @@ public class AuthController {
         private String token;
         private String tokenType = "Bearer";
         private Long expiresIn;
-        private SysLoginUserEntity user;
+        private UserVO user;
     }
 
     @PostMapping("/login")
+    @RateLimit(maxRequests = 5, windowSeconds = 60, type = RateLimitType.IP, message = "登录请求过于频繁，请稍后再试")
+    @AuditLog(module = "认证", type = OperationType.LOGIN, description = "用户登录")
     public ResultVO<LoginResponse> login(@RequestBody LoginRequest request) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getAccount(), request.getPassword())
@@ -73,7 +81,7 @@ public class AuthController {
 
         SysLoginUserEntity user = sysLoginUserService.getByAccount(request.getAccount());
         if (user == null) {
-            return ResultHelper.error("401", "User not found");
+            throw new BizException(BizCodeEnum.ACCOUNT_NOT_FOUND);
         }
 
         String token = jwtTokenUtil.generateToken(String.valueOf(user.getUserId()), user.getAccount());
@@ -83,16 +91,17 @@ public class AuthController {
         LoginResponse response = new LoginResponse();
         response.setToken(token);
         response.setExpiresIn(jwtTokenUtil.getExpireTime() / 1000);
-        response.setUser(user);
+        response.setUser(user.toUserVO());
 
         return ResultHelper.success(response);
     }
 
     @PostMapping("/register")
+    @AuditLog(module = "认证", type = OperationType.REGISTER, description = "用户注册")
     public ResultVO<UserVO> register(@RequestBody RegisterRequest request) {
         SysLoginUserEntity existingUser = sysLoginUserService.getByAccount(request.getAccount());
         if (existingUser != null) {
-            return ResultHelper.error("400", "Account already exists");
+            throw new BizException(BizCodeEnum.ACCOUNT_EXISTS);
         }
 
         SysLoginUserEntity user = new SysLoginUserEntity();
@@ -110,6 +119,7 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
+    @AuditLog(module = "认证", type = OperationType.LOGOUT, description = "用户登出")
     public ResultVO<Void> logout() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.getPrincipal() instanceof com.iy.api.model.security.LoginUser loginUser) {
@@ -127,6 +137,6 @@ public class AuthController {
         if (authentication != null && authentication.getPrincipal() instanceof com.iy.api.model.security.LoginUser loginUser) {
             return ResultHelper.success(loginUser.getUser());
         }
-        return ResultHelper.error("401", "Unauthorized");
+        throw new BizException(BizCodeEnum.UNAUTHORIZED);
     }
 }
